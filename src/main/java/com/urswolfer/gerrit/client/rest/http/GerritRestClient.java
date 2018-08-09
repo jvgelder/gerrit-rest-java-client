@@ -40,10 +40,12 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.StatusLine;
+import org.apache.http.auth.AuthSchemeProvider;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.config.AuthSchemes;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpDelete;
@@ -53,10 +55,15 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.client.protocol.RequestAuthCache;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
 import org.apache.http.cookie.Cookie;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.auth.BasicScheme;
+import org.apache.http.impl.auth.SPNegoScheme;
+import org.apache.http.impl.auth.SPNegoSchemeFactory;
 import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -72,6 +79,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.security.Principal;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -409,6 +417,24 @@ public class GerritRestClient implements RestClient {
             BasicScheme basicAuth = new BasicScheme();
             httpContext.setAttribute(PREEMPTIVE_AUTH, basicAuth);
             client.addInterceptorFirst(new PreemptiveAuthHttpRequestInterceptor(authData));
+        } else if(authData.isKerberosAuth()){
+            Credentials use_jaas_creds = new Credentials() {
+                public String getPassword() {
+                    return null;
+                }
+
+                public Principal getUserPrincipal() {
+                    return null;
+                }
+            };
+            SPNegoScheme authScheme = new SPNegoScheme();
+            httpContext.setAttribute(PREEMPTIVE_AUTH, authScheme);
+            Registry<AuthSchemeProvider> authSchemeRegistry = RegistryBuilder.<AuthSchemeProvider>create().register(AuthSchemes.SPNEGO, new SPNegoSchemeFactory(true,false)).build();
+            client.setDefaultAuthSchemeRegistry(authSchemeRegistry);
+
+            credentialsProvider.setCredentials(new AuthScope(null, -1, null), use_jaas_creds);
+            client.addInterceptorFirst(new RequestAuthCache());
+            client.addInterceptorFirst(new KerberosPreemptiveAuthHttpRequestInterceptor(authData));
         }
 
         client.addInterceptorLast(new UserAgentHttpRequestInterceptor());

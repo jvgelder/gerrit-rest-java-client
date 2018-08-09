@@ -65,6 +65,47 @@ public interface GerritAuthData {
      */
     boolean isLoginAndPasswordAvailable();
 
+    boolean isKerberosAuth();
+
+    public class Kerberos implements GerritAuthData {
+        private final String host;
+
+        public Kerberos(String host) {
+            this.host = host;
+            System.setProperty("javax.security.auth.useSubjectCredsOnly","false");
+        }
+
+        @Override
+        public String getLogin() {
+            return null;
+        }
+
+        @Override
+        public String getPassword() {
+            return null;
+        }
+
+        @Override
+        public boolean isHttpPassword() {
+            return false;
+        }
+
+        @Override
+        public String getHost() {
+            return host;
+        }
+
+        @Override
+        public boolean isLoginAndPasswordAvailable() {
+            return false;
+        }
+
+        @Override
+        public boolean isKerberosAuth() {
+            return true;
+        }
+    }
+
     /**
      * A simple implementation for providing username and password at
      * construction time.
@@ -128,6 +169,11 @@ public interface GerritAuthData {
         @Override
         public boolean isLoginAndPasswordAvailable() {
             return !Strings.isNullOrEmpty(getLogin()) && !Strings.isNullOrEmpty(getPassword());
+        }
+
+        @Override
+        public boolean isKerberosAuth() {
+            return false;
         }
 
         private String stripTrailingSlash(String host) {
